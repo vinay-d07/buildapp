@@ -1,13 +1,15 @@
 import { onBoardUser } from '@/modules/auth'
-import { UserButton } from '@clerk/nextjs'
+import Navbar from '@/modules/home/components/navbar'
+
 import React from 'react'
 
-export const Layout = async ({ children }) => {
-    await onBoardUser()
+export const Layout = ({ children }) => {
+    // Note: onBoardUser was removed since Layout is now sync
+    // Consider moving this to a middleware or separate server component
     return (
-        <main className='flex flex-col-1 items-center justify-center h-screen w-screen'>
-            <UserButton />
-            <div>{children}</div>
-        </main>
+            <main className='flex flex-col-1 items-center justify-center h-screen w-screen'>
+                <Navbar />
+                <div>{children}</div>
+            </main>
     )
 }
