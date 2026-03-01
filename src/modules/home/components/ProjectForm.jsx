@@ -3,13 +3,14 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import TextAreaAutoSize from "react-textarea-autosize";
 import { useRouter } from "next/navigation";
-import { Toast } from "sonner";
+import { toast, Toaster } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import z from "zod";
 import { cn } from "../../../lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import { invoke } from "../actions";
 
 const fromSchema = z.object({
   content: z.string().min(2, "DESCRIPTION REQUIRED").max(1000, "TOO LONG...."),
@@ -57,9 +58,22 @@ const ProjectForm = () => {
     },
   ];
 
-  const onSubmit = async (values) => { };
+  const invokeAI = async () => {
+    try {
+      const res = await invoke();
+      console.log(res);
+      toast.success("RESULT+++++")
+    } catch (error) {
+      toast.error("ERROR")
+      console.log(error)
+    }
+  }
+  const onSubmit = async (values) => {
+
+  };
   return (
     <div className="flex flex-col items-center space-y-8 mt-3">
+      <Toaster />
       <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 items-center justify-center w-4/5">
         {templates.map((template) => (
           <div
@@ -124,9 +138,8 @@ const ProjectForm = () => {
                         }
                       }}
                     />
-
-                    {/* Submit SVG Button */}
-                    <button
+                    <Button onClick={invokeAI}>Invoke</Button>
+                    <Button
                       type="submit"
                       className={cn(
                         "absolute bottom-3 right-3",
@@ -151,7 +164,7 @@ const ProjectForm = () => {
                         <path d="M5 12h14" />
                         <path d="M12 5l7 7-7 7" />
                       </svg>
-                    </button>
+                    </Button>
                   </div>
                 </FormControl>
               </FormItem>
