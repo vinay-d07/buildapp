@@ -1,22 +1,199 @@
-import { AwardIcon } from "lucide-react";
 import { inngest } from "./client";
-import { gemini, createAgent } from "@inngest/agent-kit";
+import { gemini, createAgent, createTool, createNetwork } from "@inngest/agent-kit";
 
-export const helloWorld = inngest.createFunction(
-  { id: "hello-world" },
-  { event: "agent/hello" },
-  async () => {
-    const agent = createAgent({
-      model: gemini({ model: "gemini-2.5-flash" }),
-      name: "hello-agent",
-      description: "agent that adds",
-      system: "you add numbers"
+import Sandbox from "e2b";
+import z from "zod";
+import { PROMPT } from "@/prompt";
+import { lasttextUtil } from "./utils";
+import { db } from "@/lib/db";
+
+export const codeAgent = inngest.createFunction(
+  { id: "code-agent" },
+  { event: "code-agent/run" },
+  async ({ event, step }) => {
+
+    const sandBoxID = await step?.run("get-sandbox-id-v2", async () => {
+      try {
+
+        const sandBox = await Sandbox.create(
+          "iamjohnwick944/next-js-template-v2",
+          {
+            apiKey: process.env.E2B_API_KEY
+          }
+        );
+        return sandBox.sandboxId
+      } catch (error) {
+        throw error
+      }
     })
 
-    const { output } = await agent.run("whats 2+2");
-    console.log(output);
+    const agent = createAgent({
+      model: gemini({ model: "gemini-2.5-flash" }),
+      name: "code-agent",
+      description: "a coding expert",
+      system: PROMPT,
+      tools: [
+        createTool({
+          name: "terminal",
+          description: "run a command in the terminal",
+          parameters: z.object({
+            command: z.string().describe("the command to run")
+          }),
+          handler: async (command, step) => {
+            return await step?.run("run-command", async () => {
+              try {
+                const buffers = { stdout: "", stderr: "" }
+                const sandBox = await Sandbox.connect(sandBoxID)
+                const process = await sandBox?.commands.run(command, {
+                  onStdout: (data) => {
+                    buffers.stdout += data
+                  },
+                  onStderr: (data) => {
+                    buffers.stderr += data
+                  }
+                })
+                return process.stdout
+              } catch (error) {
+                return `Command failed with error: ${error.message} \n stderr: ${buffers.stderr} \n stdout: ${buffers.stdout}`
+              }
+            })
+          }
+        }),
+        createTool({
+          name: "createOrUpdateFiles",
+          description: "tool for files",
+          parameters: z.object({
+            files: z.array(z.object({
+              path: z.string().describe("path of the file"),
+              content: z.string().describe("content of the file")
+            }))
+          }),
+          handler: async ({ files }, { step, network }) => {
+            const newFiles = await step?.run("create-update-files", async () => {
+              try {
+                const updatedFiles = network?.state.data.files || {}
+                const sandBox = await Sandbox.connect(sandBoxID)
+                for (const file of files) {
+                  await sandBox?.files.write(file.path, file.content)
+                  updatedFiles[file.path] = file.content
+                }
+                return updatedFiles
+              } catch (error) {
+                return error
+              }
+            })
+            if (typeof newFiles === "object") {
+              if (network && network.state && network.state.data) {
+                network.state.data.files = newFiles
+              }
+            }
+
+          }
+        }),
+        createTool({
+          name: "file-reader",
+          description: "reads file",
+          parameters: z.object({
+            files: z.array(z.string().describe("path of the file"))
+          }),
+          handler: async ({ files }, { step, network }) => {
+            return await step?.run("readfile", async (step) => {
+              try {
+                const sandBox = await Sandbox.connect(sandBoxID)
+                let content = []
+                for (const file of files) {
+                  const fileContent = await sandBox?.files.read(file)
+                  content.push({ path: file, content: fileContent || "" })
+                }
+                return JSON.stringify(content)
+              } catch (error) {
+                return error
+              }
+            })
+          }
+        })
+      ],
+      lifecycle: {
+        onResponse: async ({ result, network }) => {
+          const lastAssistantMessge = lasttextUtil(result)
+
+          if (!network?.state?.data) return result
+          if (!lastAssistantMessge?.includes("<task_summary>")) return result
+
+          network.state.data.summary = lastAssistantMessge
+
+          return result
+        }
+      }
+    })
+    const network = createNetwork({
+
+      name: "file-network",
+      agents: [agent]
+      , maxIter: 5,
+
+      router: async ({ network }) => {
+        const summary = network?.state.data.summary;
+        if (summary) {
+          return "file-network"
+        }
+        return agent
+      }
+    })
+
+    const input = event.data?.value ?? "Begin the coding task."
+    const result = await network.run(input)
+
+    const isError = !result.state.data.summary || Object.keys(result.state.data.summary || {}).length === 0
+    const url = await step?.run("get-url", async () => {
+      try {
+        const sandBox = await Sandbox.connect(sandBoxID)
+        const host = sandBox.getHost(3000)
+        return `http://${host}`
+      } catch (error) {
+        console.error("Failed to get URL:", error)
+        return null
+      }
+    })
+
+
+    // save each message
+    await step.run("save-result", async () => {
+      if (isError) {
+        return await db.Message.create({
+          data: {
+            projectId: event.data.projectId,
+            role: MessageRole.ASSISTANT,
+            type: MessageType.ERROR,
+            content: "some error occurred"
+          }
+        })
+
+      }
+
+      return await db.message.create({
+        data: {
+          projectId: event.data.projectId,
+          role: MessageRole.ASSISTANT,
+          type: MessageType.RESULT,
+          content: result.state.data.summary,
+          fragments: {
+            create: {
+              sandBoxUrl: url,
+              title: "untitled",
+              files: result.state.data.files,
+
+            }
+          }
+        }
+      })
+    })
+
     return {
-      message: output[0].content
+      url: url,
+      title: "untitled",
+      files: result.state.data.files,
+      summary: result.state.data.summary
     }
   }
 );

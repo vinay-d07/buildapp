@@ -10,7 +10,8 @@ import { cn } from "../../../lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
-import { invoke } from "../actions";
+
+import { useCreateProject } from "../../projects/hooks/project";
 
 const fromSchema = z.object({
   content: z.string().min(2, "DESCRIPTION REQUIRED").max(1000, "TOO LONG...."),
@@ -23,6 +24,7 @@ const ProjectForm = () => {
     defaultValues: {
       content: "",
     },
+    mode: "onChange",
   });
 
   const templates = [
@@ -57,20 +59,20 @@ const ProjectForm = () => {
         "An app for creating courses, tracking progress, and managing students.",
     },
   ];
+  const { mutateAsync, isLoading } = useCreateProject()
 
-  const invokeAI = async () => {
-    try {
-      const res = await invoke();
-      console.log(res);
-      toast.success("RESULT+++++")
-    } catch (error) {
-      toast.error("ERROR")
-      console.log(error)
-    }
-  }
   const onSubmit = async (values) => {
-
+    try {
+      const result = await mutateAsync(values.content)
+      router.push(`/projects/${result.id}`)
+      toast.success("Project created successfully")
+      form.reset()
+    } catch (error) {
+      toast.error("Something went wrong")
+    }
   };
+
+  const isButtonDisabled = isLoading || !form.watch("content").trim();
   return (
     <div className="flex flex-col items-center space-y-8 mt-3">
       <Toaster />
@@ -138,7 +140,7 @@ const ProjectForm = () => {
                         }
                       }}
                     />
-                    <Button onClick={invokeAI}>Invoke</Button>
+
                     <Button
                       type="submit"
                       className={cn(
@@ -148,10 +150,11 @@ const ProjectForm = () => {
                         "bg-black text-white",
                         "hover:bg-gray-800",
                         "transition",
+                        isButtonDisabled && "bg-muted-foreground border"
                       )}
-                    >
-                      {/* SVG Icon */}
-                      <svg
+
+                      disabled={isButtonDisabled}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
                         fill="none"
@@ -163,7 +166,7 @@ const ProjectForm = () => {
                       >
                         <path d="M5 12h14" />
                         <path d="M12 5l7 7-7 7" />
-                      </svg>
+                      </svg>}
                     </Button>
                   </div>
                 </FormControl>

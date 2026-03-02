@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { onBoardUser } from "@/modules/auth";
 import Navbar from "@/modules/home/components/Navbar";
 import { ThemeProvider } from "@/components/theme-provider";
+import { QueryProvider } from "@/components/QueryProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,9 @@ export default async function RootLayout({ children }) {
         >
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <Navbar />
-            {children}
+            <QueryProvider>
+              {children}
+            </QueryProvider>
           </ThemeProvider>
         </body>
       </html>
