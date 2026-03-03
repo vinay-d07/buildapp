@@ -6,12 +6,13 @@ import z from "zod";
 import { PROMPT } from "@/prompt";
 import { lasttextUtil } from "./utils";
 import { db } from "@/lib/db";
+import { MessageRole, MessageType } from "@/generated/prisma/enums";
 
 export const codeAgent = inngest.createFunction(
   { id: "code-agent" },
   { event: "code-agent/run" },
   async ({ event, step }) => {
-
+    console.log("EVENT RECIEVED")
     const sandBoxID = await step?.run("get-sandbox-id-v2", async () => {
       try {
 
@@ -160,7 +161,7 @@ export const codeAgent = inngest.createFunction(
     // save each message
     await step.run("save-result", async () => {
       if (isError) {
-        return await db.Message.create({
+        return await db.message.create({
           data: {
             projectId: event.data.projectId,
             role: MessageRole.ASSISTANT,

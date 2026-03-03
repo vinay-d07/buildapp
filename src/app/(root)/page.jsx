@@ -1,6 +1,6 @@
 import ProjectForm from "@/modules/home/components/ProjectForm";
-import { UserButton } from "@clerk/nextjs";
-import Image from "next/image";
+import { ProjectList } from "@/modules/home/components/ProjectList";
+
 
 export default function Home() {
   return (
@@ -18,6 +18,7 @@ export default function Home() {
             </div>
           </section>
           <ProjectForm />
+          <ProjectList />
         </div>
       </div>
     </>

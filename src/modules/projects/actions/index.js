@@ -64,8 +64,6 @@ export const getProjectById = async (projectId) => {
         where: {
             id: projectId,
             userId: user.user.id
-        }, orderBy: {
-            createdAt: "desc"
         }
     })
     return project

@@ -1,3 +1,4 @@
+"use client"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createProject, getProjectById, getProjects } from '@/modules/projects/actions'
 
