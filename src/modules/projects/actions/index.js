@@ -1,3 +1,4 @@
+
 "use server"
 
 import { inngest } from "../../../../inngest/client"
@@ -5,6 +6,7 @@ import { db } from "@/lib/db"
 import { getUser } from "@/modules/auth"
 import { generateSlug } from "random-word-slugs"
 import { MessageRole, MessageType } from "@/generated/prisma/client"
+import { consumeCredits } from "@/lib/usage"
 
 export const createProject = async (value) => {
     try {
@@ -26,7 +28,21 @@ export const createProject = async (value) => {
                 }
             }
         })
-
+        try {
+            await consumeCredits()
+        } catch (error) {
+            if (error instanceof Error) {
+                throw new Error({
+                    code: "BAD_REQUEST",
+                    message: "Something went wrong"
+                })
+            } else {
+                throw new Error({
+                    code: "TOO_MANY_REQUESTS",
+                    message: "Too many requests"
+                })
+            }
+        }
         await inngest.send({
             name: "code-agent/run",
             data: {

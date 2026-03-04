@@ -3,7 +3,7 @@ import { gemini, createAgent, createTool, createNetwork } from "@inngest/agent-k
 
 import Sandbox from "e2b";
 import z from "zod";
-import { PROMPT } from "@/prompt";
+import { PROMPT, FRAGMENT_TITLE_PROMPT, RESPONSE_PROMPT } from "@/prompt";
 import { lasttextUtil } from "./utils";
 import { db } from "@/lib/db";
 import { MessageRole, MessageType } from "@/generated/prisma/enums";
@@ -145,6 +145,46 @@ export const codeAgent = inngest.createFunction(
     const input = event.data?.value ?? "Begin the coding task."
     const result = await network.run(input)
 
+
+    //title agent
+    const titleAgent = createAgent({
+      name: "fragment-title-generator",
+      model: gemini({ model: "gemini-2.5-flash" }),
+      system: FRAGMENT_TITLE_PROMPT
+    })
+
+    const { output: fragmentTitle } = await titleAgent.run(result.state.data.summary)
+    const generateTitle = async () => {
+      if (fragmentTitle[0].type !== "text") {
+        return "untitled"
+      }
+      if (isArray(fragmentTitle[0].content)) {
+        return fragmentTitle[0].content.map((item) => item.text).join(" ")
+      } else {
+        return fragmentTitle[0].content
+      }
+
+    }
+
+    //response agent
+    const responseAgent = createAgent({
+      name: "response-agent",
+      model: gemini({ model: "gemini-2.5-flash" }),
+      system: RESPONSE_PROMPT
+    })
+    const { output: response } = await responseAgent.run(result.state.data.summary)
+    const generateRespone = async () => {
+      if (response[0].type !== "text") {
+        return ""
+      }
+      if (isArray(response[0].content)) {
+        return response[0].content.map((item) => item.text).join(" ")
+      } else {
+        return response[0].content
+      }
+    }
+
+
     const isError = !result.state.data.summary || Object.keys(result.state.data.summary || {}).length === 0
     const url = await step?.run("get-url", async () => {
       try {
@@ -177,11 +217,11 @@ export const codeAgent = inngest.createFunction(
           projectId: event.data.projectId,
           role: MessageRole.ASSISTANT,
           type: MessageType.RESULT,
-          content: result.state.data.summary,
+          content: generateRespone(),
           fragments: {
             create: {
               sandBoxUrl: url,
-              title: "untitled",
+              title: generateTitle(),
               files: result.state.data.files,
 
             }
@@ -192,7 +232,7 @@ export const codeAgent = inngest.createFunction(
 
     return {
       url: url,
-      title: "untitled",
+      title: generateTitle(),
       files: result.state.data.files,
       summary: result.state.data.summary
     }

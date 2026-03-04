@@ -45,7 +45,7 @@ enum MessageType {
 }
 
 model Message {
-  id        String      @id @default(cuid())  
+  id        String      @id @default(cuid())
   role      MessageRole
   type      MessageType
   content   String
@@ -66,4 +66,10 @@ model Fragment {
   files      Json
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model Usage {
+  key        String   @id
+  points     Int
+  expire     DateTime?
 }

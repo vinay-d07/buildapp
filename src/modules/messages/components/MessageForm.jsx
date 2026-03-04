@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { useCreateMessage } from "../hooks/messages";
+import { useStatus } from "@/modules/usage/hooks/usage";
+import { Usage } from "@/modules/usage/components/usage";
 
 
 
@@ -30,7 +32,8 @@ const MessageForm = ({ projectId }) => {
 
 
     const { mutateAsync, isLoading } = useCreateMessage(projectId)
-
+    const { data: usage, isLoading: usageLoading } = useStatus()
+    const showUsage = !!usage
     const onSubmit = async (values) => {
         try {
             console.log(values)
@@ -45,11 +48,16 @@ const MessageForm = ({ projectId }) => {
 
 
     return (
-        <div className="flex flex-col items-center space-y-8 mt-3">
+        <div className="flex flex-col items-center space-y-4 mt-3">
             <Toaster />
 
 
             <Form {...form}>
+                {
+                    showUsage && (
+                        <Usage />
+                    )
+                }
                 <form
                     onSubmit={form.handleSubmit(onSubmit)}
                     className="w-full flex flex-col items-center space-y-4"
